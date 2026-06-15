@@ -109,55 +109,6 @@
             top: 50%;
             transform: translate(-50%, -50%);
         }
-        #startScreen {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #001a00 0%, #000000 50%, #0a1a0a 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            color: #0f0;
-            text-align: center;
-            font-family: monospace;
-        }
-        #startScreen h1 {
-            font-size: 72px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 30px #0f0, 0 0 60px #00ff00, 0 0 90px #00aa00;
-            animation: glow 2s ease-in-out infinite;
-        }
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 30px #0f0, 0 0 60px #00ff00; }
-            50% { text-shadow: 0 0 40px #0f0, 0 0 80px #00ff00, 0 0 120px #00aa00; }
-        }
-        #startScreen p {
-            font-size: 18px;
-            margin: 15px;
-            max-width: 700px;
-            text-shadow: 0 0 10px #0f0;
-        }
-        #startButton {
-            margin-top: 50px;
-            padding: 18px 50px;
-            font-size: 24px;
-            background: #0f0;
-            color: #000;
-            border: 3px solid #0f0;
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-            box-shadow: 0 0 30px #0f0;
-            transition: all 0.3s;
-            font-family: monospace;
-        }
-        #startButton:hover {
-            background: #00ff00;
-            box-shadow: 0 0 50px #0f0;
-            transform: scale(1.05);
-        }
         .controls {
             position: absolute;
             bottom: 10px;
@@ -169,9 +120,6 @@
             text-shadow: 0 0 5px #0f0;
             text-align: center;
             z-index: 100;
-        }
-        .hidden {
-            display: none !important;
         }
         #damageIndicator {
             position: absolute;
@@ -189,18 +137,6 @@
     </style>
 </head>
 <body>
-    <div id="startScreen">
-        <h1>⚔ ENCHANTED REALMS ⚔</h1>
-        <p>A Deadly Journey Through Magical Darkness</p>
-        <p>Explore treacherous forests filled with ancient magic</p>
-        <p>Battle ferocious monsters for glory and power</p>
-        <p>Complete dangerous quests to become a true legend</p>
-        <button id="startButton">🗡️ ENTER THE REALM 🗡️</button>
-        <p style="margin-top: 40px; font-size: 14px; opacity: 0.8;">
-            WASD - Move | Mouse - Look Around | Click - Attack | Space - Jump
-        </p>
-    </div>
-
     <div id="gameContainer"></div>
 
     <div id="ui">
@@ -763,13 +699,10 @@
             renderer.render(scene, camera);
         }
 
-        // Start game
-        document.getElementById('startButton').addEventListener('click', () => {
-            document.getElementById('startScreen').classList.add('hidden');
-            createQuests();
-            spawnMonsters();
-            gameLoop();
-        });
+        // Initialize game immediately
+        createQuests();
+        spawnMonsters();
+        gameLoop();
 
         // Handle resize
         window.addEventListener('resize', () => {
