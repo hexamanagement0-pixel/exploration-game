@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enchanted Realms - 3D Exploration Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 14px;
+            text-shadow: 0 0 10px #0f0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border: 2px solid #0f0;
+            min-width: 200px;
+        }
+        #questLog {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            text-shadow: 0 0 10px #0f0;
+            max-width: 320px;
+            border: 2px solid #0f0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        #inventory {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            text-shadow: 0 0 10px #0f0;
+            border: 2px solid #0f0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            max-width: 300px;
+            z-index: 100;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 220px;
+            height: 220px;
+            border: 3px solid #0f0;
+            background: rgba(0, 20, 0, 0.9);
+            z-index: 100;
+            box-shadow: 0 0 20px #0f0;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 2px solid #0f0;
+            pointer-events: none;
+            z-index: 50;
+            box-shadow: 0 0 10px #0f0;
+        }
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: #0f0;
+            box-shadow: 0 0 5px #0f0;
+        }
+        #crosshair::before {
+            width: 2px;
+            height: 12px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #crosshair::after {
+            width: 12px;
+            height: 2px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #interactPrompt {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 0, 0.3);
+            border: 2px solid #0f0;
+            padding: 12px 24px;
+            color: #0f0;
+            font-family: monospace;
+            text-shadow: 0 0 10px #0f0;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 0 15px #0f0;
+        }
+        #startScreen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #001a00 0%, #000000 50%, #0a1a0a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: #0f0;
+            text-align: center;
+            font-family: monospace;
+        }
+        #startScreen h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px #0f0, 0 0 60px #00ff00, 0 0 90px #00aa00;
+            animation: glow 2s ease-in-out infinite;
+        }
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 30px #0f0, 0 0 60px #00ff00; }
+            50% { text-shadow: 0 0 40px #0f0, 0 0 80px #00ff00, 0 0 120px #00aa00; }
+        }
+        #startScreen p {
+            font-size: 18px;
+            margin: 15px;
+            max-width: 700px;
+            text-shadow: 0 0 10px #0f0;
+        }
+        #startButton {
+            margin-top: 50px;
+            padding: 18px 50px;
+            font-size: 24px;
+            background: #0f0;
+            color: #000;
+            border: 3px solid #0f0;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 0 30px #0f0;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        #startButton:hover {
+            background: #00ff00;
+            box-shadow: 0 0 50px #0f0;
+            transform: scale(1.05);
+        }
+        .controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            z-index: 100;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #damageIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff0000;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff0000;
+            pointer-events: none;
+            z-index: 40;
+            display: none;
+        }
+        #bossWarning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff3300;
+            font-size: 48px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff3300;
+            pointer-events: none;
+            z-index: 40;
+            display: none;
+            animation: pulse 0.5s ease-in-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>⚔ ENCHANTED REALMS ⚔</h1>
+        <p>A Deadly Journey Through Magical Darkness</p>
+        <p>Explore treacherous forests filled with ancient magic</p>
+        <p>Battle ferocious monsters for glory and power</p>
+        <p>Complete dangerous quests to become a true legend</p>
+        <button id="startButton">🗡️ ENTER THE REALM 🗡️</button>
+        <p style="margin-top: 40px; font-size: 14px; opacity: 0.8;">
+            WASD - Move | Mouse - Look Around | Click - Attack | Space - Jump
+        </p>
+    </div>
+
+    <div id="gameContainer"></div>
+
+    <div id="ui">
+        <div>❤️ Health: <span id="health">100</span>/100</div>
+        <div>✨ Mana: <span id="mana">50</span>/50</div>
+        <div>⭐ Exp: <span id="exp">0</span></div>
+        <div>📊 Level: <span id="level">1</span></div>
+        <div style="margin-top: 10px; font-size: 11px; opacity: 0.8;">Pos: <span id="position">0,0,0</span></div>
+        <div id="combatLog" style="margin-top: 10px; font-size: 11px; color: #ffaa00;"></div>
+    </div>
+
+    <div id="questLog">
+        <h3 style="margin-bottom: 10px; color: #ffff00;">📜 ACTIVE QUESTS</h3>
+        <div id="questContent"></div>
+    </div>
+
+    <div id="inventory">
+        <h3 style="margin-bottom: 10px; color: #ffff00;">🎒 INVENTORY</h3>
+        <div id="inventoryContent"></div>
+    </div>
+
+    <canvas id="minimap"></canvas>
+
+    <div id="crosshair"></div>
+    <div id="interactPrompt"></div>
+    <div id="damageIndicator"></div>
+    <div id="bossWarning"></div>
+
+    <div class="controls">W/A/S/D - Move | MOUSE - Look | CLICK - Attack | SPACE - Jump
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+
+    <script>
+        // ============ GAME CONSTANTS ============
+        const GAME_WIDTH = window.innerWidth;
+        const GAME_HEIGHT = window.innerHeight;
+        const WORLD_SIZE = 3000;
+
+        // ============ GAME STATE ============
+        const gameState = {
+            health: 100,
+            maxHealth: 100,
+            mana: 50,
+            maxMana: 50,
+            experience: 0,
+            level: 1,
+            inventory: [],
+            quests: [],
+            activeQuests: [],
+            monsters: [],
+            trees: [],
+            questItems: [],
+            totalKills: 0,
+            combatLog: []
+        };
+
+        // ============ SCENE SETUP ============
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0f0a);
+        scene.fog = new THREE.Fog(0x0a0f0a, 800, 4000);
+
+        const camera = new THREE.PerspectiveCamera(75, GAME_WIDTH / GAME_HEIGHT, 0.1, 10000);
+        camera.position.set(0, 6, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(GAME_WIDTH, GAME_HEIGHT);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        renderer.shadowMap.resolution = 2048;
+        document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+        // ============ PHYSICS WORLD ============
+        const physicsWorld = new CANNON.World();
+        physicsWorld.gravity.set(0, -15, 0);
+        physicsWorld.defaultContactMaterial.friction = 0.5;
+
+        // ============ PLAYER SETUP ============
+        const playerShape = new CANNON.Capsule(0.4, 1.5);
+        const playerBody = new CANNON.Body({ mass: 1, shape: playerShape, linearDamping: 0.3 });
+        playerBody.position.set(0, 3, 0);
+        physicsWorld.addBody(playerBody);
+
+        const playerGeometry = new THREE.CapsuleGeometry(0.4, 1.8, 8, 16);
+        const playerMaterial = new THREE.MeshStandardMaterial({
+            color: 0x00ff00,
+            emissive: 0x00aa00,
+            emissiveIntensity: 0.3,
+            metalness: 0.3,
+            roughness: 0.4
+        });
+        const playerMesh = new THREE.Mesh(playerGeometry, playerMaterial);
+        playerMesh.castShadow = true;
+        playerMesh.receiveShadow = true;
+        scene.add(playerMesh);
+
+        let isJumping = false;
+        let canJump = true;
+        let playerVelocity = new THREE.Vector3();
+
+        // ============ GROUND ============
+        const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a3d1a,
+            roughness: 0.9,
+            metalness: 0.0,
+            map: createGroundTexture()
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        function createGroundTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a3d1a';
+            ctx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 5000; i++) {
+                ctx.fillStyle = `rgba(0,${Math.random() * 100}, 0, ${Math.random() * 0.3})`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 3, Math.random() * 3);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const groundShape = new CANNON.Plane();
+        const groundBody = new CANNON.Body({ mass: 0 });
+        groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        physicsWorld.addBody(groundBody);
+
+        // ============ LIGHTING ============
+        const ambientLight = new THREE.AmbientLight(0x2d5a2d, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        directionalLight.position.set(150, 150, 150);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 4096;
+        directionalLight.shadow.mapSize.height = 4096;
+        directionalLight.shadow.camera.far = 800;
+        directionalLight.shadow.camera.left = -400;
+        directionalLight.shadow.camera.right = 400;
+        directionalLight.shadow.camera.top = 400;
+        directionalLight.shadow.camera.bottom = -400;
+        directionalLight.shadow.bias = -0.001;
+        scene.add(directionalLight);
+
+        // Add point lights for atmosphere
+        const pointLight1 = new THREE.PointLight(0x00ff00, 0.5, 300);
+        pointLight1.position.set(-500, 50, -500);
+        pointLight1.castShadow = true;
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0x00aa00, 0.3, 250);
+        pointLight2.position.set(500, 50, 500);
+        pointLight2.castShadow = true;
+        scene.add(pointLight2);
+
+        // ============ INPUT SYSTEM ============
+        const keys = {};
+        const mouseState = { x: 0, y: 0, down: false };
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === ' ' && canJump && !isJumping) {
+                playerBody.velocity.y = 8;
+                isJumping = true;
+                canJump = false;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            mouseState.x = (e.clientX / GAME_WIDTH) * 2 - 1;
+            mouseState.y = -(e.clientY / GAME_HEIGHT) * 2 + 1;
+        });
+
+        document.addEventListener('click', () => {
+            playerAttack();
+        });
+
+        // ============ FOREST GENERATION ============
+        function createTree(x, z, size = 1) {
+            const trunkHeight = 8 * size;
+            const trunkRadius = 1.5 * size;
+            
+            const trunkGeometry = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 12);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4d2600,
+                roughness: 0.8,
+                metalness: 0.0
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.set(x, trunkHeight / 2, z);
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            trunk.scale.z = 0.9;
+            trunk.scale.x = 0.9;
+            scene.add(trunk);
+
+            // Multiple foliage layers for realism
+            const foliageLayers = [
+                { radius: 6 * size, height: 14 * size, color: 0x00cc00 },
+                { radius: 5 * size, height: 17 * size, color: 0x009900 },
+                { radius: 4 * size, height: 20 * size, color: 0x00ff00 }
+            ];
+
+            foliageLayers.forEach(layer => {
+                const foliageGeometry = new THREE.IcosahedronGeometry(layer.radius, 3);
+                const foliageMaterial = new THREE.MeshStandardMaterial({
+                    color: layer.color,
+                    emissive: 0x004400,
+                    emissiveIntensity: 0.2,
+                    roughness: 0.6,
+                    metalness: 0.0
+                });
+                const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+                foliage.position.set(x, layer.height, z);
+                foliage.castShadow = true;
+                foliage.receiveShadow = true;
+                scene.add(foliage);
+            });
+
+            // Magical aura particles
+            const particleCount = 30;
+            const particlesGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = x + (Math.random() - 0.5) * 12;
+                positions[i + 1] = 10 * size + Math.random() * 8;
+                positions[i + 2] = z + (Math.random() - 0.5) * 12;
+            }
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const particlesMaterial = new THREE.PointsMaterial({
+                color: 0x00ff00,
+                size: 0.5,
+                transparent: true,
+                opacity: 0.6
+            });
+            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
+
+            gameState.trees.push({
+                particles: particles,
+                x: x,
+                z: z
+            });
+        }
+
+        // Generate dense magical forest
+        for (let i = 0; i < 80; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 200 + Math.random() * 1400;
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
+            const size = 0.8 + Math.random() * 0.6;
+            createTree(x, z, size);
+        }
+
+        // ============ MONSTER SYSTEM ============
+        class Monster {
+            constructor(x, z, type = 'goblin', difficulty = 1) {
+                this.type = type;
+                this.difficulty = difficulty;
+                this.position = new THREE.Vector3(x, 2, z);
+                this.velocity = new THREE.Vector3();
+                this.attackCooldown = 0;
+                this.attackRange = 2;
+                this.detectionRange = 100;
+                this.lastAttackTime = 0;
+
+                if (type === 'goblin') {
+                    this.health = 30 * difficulty;
+                    this.maxHealth = this.health;
+                    this.damage = 12 * difficulty;
+                    this.speed = 0.12;
+                    this.size = 0.8;
+                    this.color = 0x2d5a2d;
+                } else if (type === 'orc') {
+                    this.health = 60 * difficulty;
+                    this.maxHealth = this.health;
+                    this.damage = 20 * difficulty;
+                    this.speed = 0.1;
+                    this.size = 1.3;
+                    this.color = 0x663333;
+                } else if (type === 'demon') {
+                    this.health = 100 * difficulty;
+                    this.maxHealth = this.health;
+                    this.damage = 35 * difficulty;
+                    this.speed = 0.15;
+                    this.size = 1.5;
+                    this.color = 0xff3300;
+                } else if (type === 'forest_guardian') {
+                    this.health = 300 * difficulty;
+                    this.maxHealth = this.health;
+                    this.damage = 50 * difficulty;
+                    this.speed = 0.08;
+                    this.size = 2.5;
+                    this.color = 0xff6600;
+                    this.isBoss = true;
+                }
+
+                // Create monster mesh
+                const geometry = new THREE.BoxGeometry(this.size, this.size * 1.8, this.size * 0.8);
+                const material = new THREE.MeshStandardMaterial({
+                    color: this.color,
+                    metalness: 0.2,
+                    roughness: 0.6,
+                    emissive: this.isBoss ? 0xff3300 : 0x000000,
+                    emissiveIntensity: this.isBoss ? 0.5 : 0
+                });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                this.mesh.position.copy(this.position);
+                scene.add(this.mesh);
+
+                // Health bar
+                this.createHealthBar();
+            }
+
+            createHealthBar() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 16;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, 0, 128, 16);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(0, 0, 128, 16);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const healthBarGeometry = new THREE.PlaneGeometry(this.size * 2, 0.3);
+                const healthBarMaterial = new THREE.MeshBasicMaterial({ map: texture });
+                this.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+                this.healthBar.position.y = this.size * 1.2;
+                scene.add(this.healthBar);
+            }
+
+            update(playerPosition, deltaTime) {
+                if (this.health <= 0) return;
+
+                const distance = this.position.distanceTo(playerPosition);
+
+                if (distance < this.detectionRange) {
+                    const direction = playerPosition.clone().sub(this.position).normalize();
+                    this.velocity = direction.multiplyScalar(this.speed);
+                    this.position.add(this.velocity);
+                }
+
+                this.mesh.position.copy(this.position);
+                this.healthBar.position.copy(this.position);
+                this.healthBar.position.y += this.size * 1.2;
+
+                this.attackCooldown--;
+
+                if (distance < this.attackRange && this.attackCooldown <= 0) {
+                    gameState.health -= this.damage;
+                    this.attackCooldown = 60;
+                    showDamageIndicator(this.damage);
+                    addCombatLog(`${this.type} hits you for ${this.damage} damage!`);
+                }
+            }
+
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health < 0) this.health = 0;
+            }
+
+            dispose() {
+                scene.remove(this.mesh);
+                scene.remove(this.healthBar);
+            }
+        }
+
+        // Spawn monsters with varying difficulty
+        function spawnMonsters() {
+            const monsterTypes = ['goblin', 'orc', 'demon'];
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 300 + Math.random() * 1200;
+                const x = Math.cos(angle) * distance;
+                const z = Math.sin(angle) * distance;
+                const type = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
+                const difficulty = 1 + Math.floor(gameState.level * 0.3);
+                const monster = new Monster(x, z, type, difficulty);
+                gameState.monsters.push(monster);
+            }
+
+            // Spawn a boss monster
+            const bossAngle = Math.random() * Math.PI * 2;
+            const bossDistance = 800;
+            const bossX = Math.cos(bossAngle) * bossDistance;
+            const bossZ = Math.sin(bossAngle) * bossDistance;
+            const boss = new Monster(bossX, bossZ, 'forest_guardian', 2);
+            gameState.monsters.push(boss);
+        }
+
+        // ============ COMBAT SYSTEM ============
+        function playerAttack() {
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+            let closestMonster = null;
+            let closestDistance = 50;
+
+            for (let monster of gameState.monsters) {
+                if (monster.health > 0) {
+                    const distance = monster.position.distanceTo(playerMesh.position);
+                    if (distance < closestDistance && distance < 50) {
+                        closestDistance = distance;
+                        closestMonster = monster;
+                    }
+                }
+            }
+
+            if (closestMonster) {
+                const damage = 20 + Math.random() * 25;
+                closestMonster.takeDamage(damage);
+                gameState.experience += 15;
+
+                if (closestMonster.isBoss) {
+                    showBossWarning(`⚡ BOSS HIT: ${damage.toFixed(0)} DAMAGE ⚡`);
+                }
+
+                addCombatLog(`You hit ${closestMonster.type} for ${damage.toFixed(0)} damage!`);
+
+                if (closestMonster.health <= 0) {
+                    const reward = closestMonster.isBoss ? 1000 : 100 * closestMonster.difficulty;
+                    gameState.experience += reward;
+                    gameState.totalKills++;
+                    addCombatLog(`Defeated ${closestMonster.type}! +${reward} XP`);
+                    gameState.inventory.push({
+                        name: `${closestMonster.type} essence`,
+                        quantity: 1,
+                        value: 100 * closestMonster.difficulty
+                    });
+                }
+            }
+        }
+
+        function showDamageIndicator(damage) {
+            const indicator = document.getElementById('damageIndicator');
+            indicator.textContent = `-${damage.toFixed(0)}`;
+            indicator.style.display = 'block';
+            setTimeout(() => { indicator.style.display = 'none'; }, 1000);
+        }
+
+        function showBossWarning(text) {
+            const warning = document.getElementById('bossWarning');
+            warning.textContent = text;
+            warning.style.display = 'block';
+            setTimeout(() => { warning.style.display = 'none'; }, 1500);
+        }
+
+        function addCombatLog(text) {
+            gameState.combatLog.unshift(text);
+            if (gameState.combatLog.length > 5) gameState.combatLog.pop();
+            document.getElementById('combatLog').innerHTML = gameState.combatLog.join('<br>');
+        }
+
+        // ============ QUEST SYSTEM ============
+        function createQuests() {
+            gameState.quests = [
+                {
+                    id: 1,
+                    title: "⚔️ Defeat the Forest Guardian",
+                    description: "Find and defeat the powerful boss monster",
+                    completed: false,
+                    reward: 1000,
+                    progress: "0/1"
+                },
+                {
+                    id: 2,
+                    title: "🔥 Slay 10 Demons",
+                    description: "Defeat 10 demon type monsters",
+                    completed: false,
+                    reward: 500,
+                    progress: "0/10",
+                    target: 'demon',
+                    count: 0
+                },
+                {
+                    id: 3,
+                    title: "💪 Reach Level 5",
+                    description: "Gain experience and level up",
+                    completed: false,
+                    reward: 300,
+                    progress: `${gameState.level}/5`
+                },
+                {
+                    id: 4,
+                    title: "🗡️ Get 50 Kills",
+                    description: "Defeat 50 monsters total",
+                    completed: false,
+                    reward: 750,
+                    progress: `${gameState.totalKills}/50`
+                }
+            ];
+
+            gameState.activeQuests = gameState.quests;
+        }
+
+        // ============ UI UPDATES ============
+        function updateUI() {
+            document.getElementById('health').textContent = Math.max(0, Math.floor(gameState.health));
+            document.getElementById('mana').textContent = gameState.mana;
+            document.getElementById('exp').textContent = gameState.experience;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('position').textContent = 
+                `${playerMesh.position.x.toFixed(0)},${playerMesh.position.y.toFixed(0)},${playerMesh.position.z.toFixed(0)}`;
+
+            // Update quests
+            let questHTML = '';
+            for (let quest of gameState.activeQuests) {
+                const status = quest.completed ? '✅' : '🔄';
+                questHTML += `<div style="margin: 8px 0; padding: 8px; border: 1px solid #0f0; background: rgba(0,255,0,0.1);">
+                    <strong>${status} ${quest.title}</strong><br>
+                    <small>${quest.description}</small><br>
+                    <small style="color: #ffff00;">Progress: ${quest.progress}</small>
+                </div>`;
+            }
+            document.getElementById('questContent').innerHTML = questHTML;
+
+            // Update inventory
+            let invHTML = '';
+            for (let item of gameState.inventory) {
+                invHTML += `<div>✦ ${item.name} x${item.quantity}</div>`;
+            }
+            if (invHTML === '') invHTML = '<div>Empty</div>';
+            document.getElementById('inventoryContent').innerHTML = invHTML;
+        }
+
+        // ============ LEVEL UP SYSTEM ============
+        function checkLevelUp() {
+            const expPerLevel = 300 * gameState.level;
+            if (gameState.experience >= expPerLevel) {
+                gameState.level++;
+                gameState.maxHealth += 20;
+                gameState.health = gameState.maxHealth;
+                gameState.maxMana += 15;
+                gameState.mana = gameState.maxMana;
+                addCombatLog(`🌟 LEVEL UP! Level ${gameState.level}!`);
+                
+                // Spawn new monsters when level up
+                for (let i = 0; i < 3; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 400 + Math.random() * 800;
+                    const x = playerMesh.position.x + Math.cos(angle) * distance;
+                    const z = playerMesh.position.z + Math.sin(angle) * distance;
+                    const types = ['goblin', 'orc', 'demon'];
+                    const type = types[Math.floor(Math.random() * types.length)];
+                    const monster = new Monster(x, z, type, 1 + Math.floor(gameState.level * 0.3));
+                    gameState.monsters.push(monster);
+                }
+            }
+        }
+
+        // ============ MINIMAP ============
+        function updateMinimap() {
+            const canvas = document.getElementById('minimap');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(0, 20, 0, 0.9)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const mapScale = 1500;
+            const scale = canvas.width / (mapScale * 2);
+
+            // Draw trees
+            ctx.fillStyle = '#00aa00';
+            for (let tree of gameState.trees) {
+                const tx = (tree.x / mapScale) * canvas.width / 2 + canvas.width / 2;
+                const ty = (tree.z / mapScale) * canvas.height / 2 + canvas.height / 2;
+                if (tx > 0 && tx < canvas.width && ty > 0 && ty < canvas.height) {
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw player
+            const playerX = (playerMesh.position.x / mapScale) * canvas.width / 2 + canvas.width / 2;
+            const playerY = (playerMesh.position.z / mapScale) * canvas.height / 2 + canvas.height / 2;
+            ctx.fillStyle = '#0f0';
+            ctx.beginPath();
+            ctx.arc(playerX, playerY, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw monsters
+            for (let monster of gameState.monsters) {
+                if (monster.health > 0) {
+                    const mx = (monster.position.x / mapScale) * canvas.width / 2 + canvas.width / 2;
+                    const my = (monster.position.z / mapScale) * canvas.height / 2 + canvas.height / 2;
+                    if (mx > 0 && mx < canvas.width && my > 0 && my < canvas.height) {
+                        ctx.fillStyle = monster.isBoss ? '#ff6600' : '#ff0000';
+                        ctx.beginPath();
+                        ctx.arc(mx, my, monster.isBoss ? 5 : 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Border
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // ============ MAIN GAME LOOP ============
+        let lastTime = Date.now();
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+
+            const currentTime = Date.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // Player movement with acceleration
+            const moveVector = new THREE.Vector3();
+            if (keys['w'] || keys['arrowup']) moveVector.z -= 1;
+            if (keys['s'] || keys['arrowdown']) moveVector.z += 1;
+            if (keys['a'] || keys['arrowleft']) moveVector.x -= 1;
+            if (keys['d'] || keys['arrowright']) moveVector.x += 1;
+
+            if (moveVector.length() > 0) {
+                moveVector.normalize().multiplyScalar(0.35);
+                playerBody.velocity.x = moveVector.x * 20;
+                playerBody.velocity.z = moveVector.z * 20;
+            }
+
+            playerMesh.position.copy(playerBody.position);
+
+            // Camera follow with smooth rotation
+            const cameraOffset = new THREE.Vector3(0, 2.5, 10);
+            const targetCameraPos = playerMesh.position.clone().add(cameraOffset);
+            camera.position.lerp(targetCameraPos, 0.15);
+            camera.lookAt(playerMesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+
+            // Update monsters
+            for (let monster of gameState.monsters) {
+                monster.update(playerMesh.position, deltaTime);
+            }
+
+            // Physics
+            physicsWorld.step(1 / 60);
+
+            // Check ground collision for jumping
+            const raycaster = new THREE.Raycaster(playerMesh.position, new THREE.Vector3(0, -1, 0));
+            if (raycaster.ray.origin.y - 1 <= 0.5) {
+                canJump = true;
+                isJumping = false;
+            } else {
+                canJump = false;
+            }
+
+            // Remove dead monsters
+            gameState.monsters = gameState.monsters.filter(m => {
+                if (m.health <= 0) {
+                    m.dispose();
+                    return false;
+                }
+                return true;
+            });
+
+            // Game over
+            if (gameState.health <= 0) {
+                alert(`💀 GAME OVER! 💀\nKills: ${gameState.totalKills}\nLevel: ${gameState.level}\nExperience: ${gameState.experience}`);
+                location.reload();
+            }
+
+            // Constrain to world
+            const maxPos = WORLD_SIZE / 2;
+            playerMesh.position.x = Math.max(-maxPos, Math.min(maxPos, playerMesh.position.x));
+            playerMesh.position.z = Math.max(-maxPos, Math.min(maxPos, playerMesh.position.z));
+
+            updateUI();
+            checkLevelUp();
+            updateMinimap();
+
+            renderer.render(scene, camera);
+        }
+
+        // ============ START SCREEN ============
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startScreen').classList.add('hidden');
+            createQuests();
+            spawnMonsters();
+            gameLoop();
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
