@@ -31,7 +31,7 @@
             background: rgba(0, 0, 0, 0.7);
             padding: 15px;
             border: 2px solid #0f0;
-            min-width: 200px;
+            min-width: 250px;
         }
         #questLog {
             position: absolute;
@@ -108,21 +108,6 @@
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-        }
-        #interactPrompt {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 255, 0, 0.3);
-            border: 2px solid #0f0;
-            padding: 12px 24px;
-            color: #0f0;
-            font-family: monospace;
-            text-shadow: 0 0 10px #0f0;
-            display: none;
-            z-index: 100;
-            box-shadow: 0 0 15px #0f0;
         }
         #startScreen {
             position: absolute;
@@ -201,24 +186,6 @@
             z-index: 40;
             display: none;
         }
-        #bossWarning {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ff3300;
-            font-size: 48px;
-            font-weight: bold;
-            text-shadow: 0 0 20px #ff3300;
-            pointer-events: none;
-            z-index: 40;
-            display: none;
-            animation: pulse 0.5s ease-in-out;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.2); }
-        }
     </style>
 </head>
 <body>
@@ -256,17 +223,12 @@
     </div>
 
     <canvas id="minimap"></canvas>
-
     <div id="crosshair"></div>
-    <div id="interactPrompt"></div>
     <div id="damageIndicator"></div>
-    <div id="bossWarning"></div>
 
-    <div class="controls">W/A/S/D - Move | MOUSE - Look | CLICK - Attack | SPACE - Jump
-    </div>
+    <div class="controls">W/A/S/D - Move | MOUSE - Look | CLICK - Attack | SPACE - Jump</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@r128/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
         // ============ GAME CONSTANTS ============
@@ -289,7 +251,8 @@
             trees: [],
             questItems: [],
             totalKills: 0,
-            combatLog: []
+            combatLog: [],
+            isJumping: false
         };
 
         // ============ SCENE SETUP ============
@@ -305,20 +268,9 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFShadowShadowMap;
-        renderer.shadowMap.resolution = 2048;
         document.getElementById('gameContainer').appendChild(renderer.domElement);
 
-        // ============ PHYSICS WORLD ============
-        const physicsWorld = new CANNON.World();
-        physicsWorld.gravity.set(0, -15, 0);
-        physicsWorld.defaultContactMaterial.friction = 0.5;
-
-        // ============ PLAYER SETUP ============
-        const playerShape = new CANNON.Capsule(0.4, 1.5);
-        const playerBody = new CANNON.Body({ mass: 1, shape: playerShape, linearDamping: 0.3 });
-        playerBody.position.set(0, 3, 0);
-        physicsWorld.addBody(playerBody);
-
+        // ============ PLAYER ============
         const playerGeometry = new THREE.CapsuleGeometry(0.4, 1.8, 8, 16);
         const playerMaterial = new THREE.MeshStandardMaterial({
             color: 0x00ff00,
@@ -330,92 +282,55 @@
         const playerMesh = new THREE.Mesh(playerGeometry, playerMaterial);
         playerMesh.castShadow = true;
         playerMesh.receiveShadow = true;
+        playerMesh.position.set(0, 5, 0);
         scene.add(playerMesh);
 
-        let isJumping = false;
-        let canJump = true;
-        let playerVelocity = new THREE.Vector3();
+        let playerVelocity = new THREE.Vector3(0, 0, 0);
+        const playerSpeed = 0.3;
 
         // ============ GROUND ============
         const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
         const groundMaterial = new THREE.MeshStandardMaterial({
             color: 0x1a3d1a,
             roughness: 0.9,
-            metalness: 0.0,
-            map: createGroundTexture()
+            metalness: 0.0
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        function createGroundTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#1a3d1a';
-            ctx.fillRect(0, 0, 512, 512);
-            for (let i = 0; i < 5000; i++) {
-                ctx.fillStyle = `rgba(0,${Math.random() * 100}, 0, ${Math.random() * 0.3})`;
-                ctx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 3, Math.random() * 3);
-            }
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        const groundShape = new CANNON.Plane();
-        const groundBody = new CANNON.Body({ mass: 0 });
-        groundBody.addShape(groundShape);
-        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-        physicsWorld.addBody(groundBody);
-
         // ============ LIGHTING ============
-        const ambientLight = new THREE.AmbientLight(0x2d5a2d, 0.5);
+        const ambientLight = new THREE.AmbientLight(0x2d5a2d, 0.6);
         scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
         directionalLight.position.set(150, 150, 150);
         directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 4096;
-        directionalLight.shadow.mapSize.height = 4096;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
         directionalLight.shadow.camera.far = 800;
         directionalLight.shadow.camera.left = -400;
         directionalLight.shadow.camera.right = 400;
         directionalLight.shadow.camera.top = 400;
         directionalLight.shadow.camera.bottom = -400;
-        directionalLight.shadow.bias = -0.001;
         scene.add(directionalLight);
 
-        // Add point lights for atmosphere
-        const pointLight1 = new THREE.PointLight(0x00ff00, 0.5, 300);
-        pointLight1.position.set(-500, 50, -500);
-        pointLight1.castShadow = true;
-        scene.add(pointLight1);
-
-        const pointLight2 = new THREE.PointLight(0x00aa00, 0.3, 250);
-        pointLight2.position.set(500, 50, 500);
-        pointLight2.castShadow = true;
-        scene.add(pointLight2);
+        const pointLight = new THREE.PointLight(0x00ff00, 0.5, 300);
+        pointLight.position.set(-500, 50, -500);
+        scene.add(pointLight);
 
         // ============ INPUT SYSTEM ============
         const keys = {};
-        const mouseState = { x: 0, y: 0, down: false };
-
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
-            if (e.key === ' ' && canJump && !isJumping) {
-                playerBody.velocity.y = 8;
-                isJumping = true;
-                canJump = false;
+            if (e.key === ' ' && !gameState.isJumping) {
+                playerVelocity.y = 8;
+                gameState.isJumping = true;
             }
         });
-
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            mouseState.x = (e.clientX / GAME_WIDTH) * 2 - 1;
-            mouseState.y = -(e.clientY / GAME_HEIGHT) * 2 + 1;
         });
 
         document.addEventListener('click', () => {
@@ -430,67 +345,31 @@
             const trunkGeometry = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 12);
             const trunkMaterial = new THREE.MeshStandardMaterial({
                 color: 0x4d2600,
-                roughness: 0.8,
-                metalness: 0.0
+                roughness: 0.8
             });
             const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
             trunk.position.set(x, trunkHeight / 2, z);
             trunk.castShadow = true;
             trunk.receiveShadow = true;
-            trunk.scale.z = 0.9;
-            trunk.scale.x = 0.9;
             scene.add(trunk);
 
-            // Multiple foliage layers for realism
-            const foliageLayers = [
-                { radius: 6 * size, height: 14 * size, color: 0x00cc00 },
-                { radius: 5 * size, height: 17 * size, color: 0x009900 },
-                { radius: 4 * size, height: 20 * size, color: 0x00ff00 }
-            ];
-
-            foliageLayers.forEach(layer => {
-                const foliageGeometry = new THREE.IcosahedronGeometry(layer.radius, 3);
-                const foliageMaterial = new THREE.MeshStandardMaterial({
-                    color: layer.color,
-                    emissive: 0x004400,
-                    emissiveIntensity: 0.2,
-                    roughness: 0.6,
-                    metalness: 0.0
-                });
-                const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-                foliage.position.set(x, layer.height, z);
-                foliage.castShadow = true;
-                foliage.receiveShadow = true;
-                scene.add(foliage);
+            const foliageGeometry = new THREE.IcosahedronGeometry(6 * size, 3);
+            const foliageMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00cc00,
+                emissive: 0x004400,
+                emissiveIntensity: 0.2,
+                roughness: 0.6
             });
+            const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+            foliage.position.set(x, 14 * size, z);
+            foliage.castShadow = true;
+            foliage.receiveShadow = true;
+            scene.add(foliage);
 
-            // Magical aura particles
-            const particleCount = 30;
-            const particlesGeometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            for (let i = 0; i < particleCount * 3; i += 3) {
-                positions[i] = x + (Math.random() - 0.5) * 12;
-                positions[i + 1] = 10 * size + Math.random() * 8;
-                positions[i + 2] = z + (Math.random() - 0.5) * 12;
-            }
-            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const particlesMaterial = new THREE.PointsMaterial({
-                color: 0x00ff00,
-                size: 0.5,
-                transparent: true,
-                opacity: 0.6
-            });
-            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-            scene.add(particles);
-
-            gameState.trees.push({
-                particles: particles,
-                x: x,
-                z: z
-            });
+            gameState.trees.push({ x: x, z: z });
         }
 
-        // Generate dense magical forest
+        // Generate forest
         for (let i = 0; i < 80; i++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = 200 + Math.random() * 1400;
@@ -508,9 +387,6 @@
                 this.position = new THREE.Vector3(x, 2, z);
                 this.velocity = new THREE.Vector3();
                 this.attackCooldown = 0;
-                this.attackRange = 2;
-                this.detectionRange = 100;
-                this.lastAttackTime = 0;
 
                 if (type === 'goblin') {
                     this.health = 30 * difficulty;
@@ -543,7 +419,6 @@
                     this.isBoss = true;
                 }
 
-                // Create monster mesh
                 const geometry = new THREE.BoxGeometry(this.size, this.size * 1.8, this.size * 0.8);
                 const material = new THREE.MeshStandardMaterial({
                     color: this.color,
@@ -558,7 +433,6 @@
                 this.mesh.position.copy(this.position);
                 scene.add(this.mesh);
 
-                // Health bar
                 this.createHealthBar();
             }
 
@@ -580,16 +454,11 @@
                 scene.add(this.healthBar);
             }
 
-            update(playerPosition, deltaTime) {
+            update(playerPosition) {
                 if (this.health <= 0) return;
 
-                const distance = this.position.distanceTo(playerPosition);
-
-                if (distance < this.detectionRange) {
-                    const direction = playerPosition.clone().sub(this.position).normalize();
-                    this.velocity = direction.multiplyScalar(this.speed);
-                    this.position.add(this.velocity);
-                }
+                const direction = playerPosition.clone().sub(this.position).normalize();
+                this.position.add(direction.multiplyScalar(this.speed));
 
                 this.mesh.position.copy(this.position);
                 this.healthBar.position.copy(this.position);
@@ -597,7 +466,8 @@
 
                 this.attackCooldown--;
 
-                if (distance < this.attackRange && this.attackCooldown <= 0) {
+                const distance = this.position.distanceTo(playerPosition);
+                if (distance < 2 && this.attackCooldown <= 0) {
                     gameState.health -= this.damage;
                     this.attackCooldown = 60;
                     showDamageIndicator(this.damage);
@@ -616,7 +486,7 @@
             }
         }
 
-        // Spawn monsters with varying difficulty
+        // Spawn monsters
         function spawnMonsters() {
             const monsterTypes = ['goblin', 'orc', 'demon'];
             for (let i = 0; i < 20; i++) {
@@ -630,7 +500,6 @@
                 gameState.monsters.push(monster);
             }
 
-            // Spawn a boss monster
             const bossAngle = Math.random() * Math.PI * 2;
             const bossDistance = 800;
             const bossX = Math.cos(bossAngle) * bossDistance;
@@ -641,9 +510,6 @@
 
         // ============ COMBAT SYSTEM ============
         function playerAttack() {
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
             let closestMonster = null;
             let closestDistance = 50;
 
@@ -661,11 +527,6 @@
                 const damage = 20 + Math.random() * 25;
                 closestMonster.takeDamage(damage);
                 gameState.experience += 15;
-
-                if (closestMonster.isBoss) {
-                    showBossWarning(`⚡ BOSS HIT: ${damage.toFixed(0)} DAMAGE ⚡`);
-                }
-
                 addCombatLog(`You hit ${closestMonster.type} for ${damage.toFixed(0)} damage!`);
 
                 if (closestMonster.health <= 0) {
@@ -687,13 +548,6 @@
             indicator.textContent = `-${damage.toFixed(0)}`;
             indicator.style.display = 'block';
             setTimeout(() => { indicator.style.display = 'none'; }, 1000);
-        }
-
-        function showBossWarning(text) {
-            const warning = document.getElementById('bossWarning');
-            warning.textContent = text;
-            warning.style.display = 'block';
-            setTimeout(() => { warning.style.display = 'none'; }, 1500);
         }
 
         function addCombatLog(text) {
@@ -719,9 +573,7 @@
                     description: "Defeat 10 demon type monsters",
                     completed: false,
                     reward: 500,
-                    progress: "0/10",
-                    target: 'demon',
-                    count: 0
+                    progress: "0/10"
                 },
                 {
                     id: 3,
@@ -753,7 +605,6 @@
             document.getElementById('position').textContent = 
                 `${playerMesh.position.x.toFixed(0)},${playerMesh.position.y.toFixed(0)},${playerMesh.position.z.toFixed(0)}`;
 
-            // Update quests
             let questHTML = '';
             for (let quest of gameState.activeQuests) {
                 const status = quest.completed ? '✅' : '🔄';
@@ -765,7 +616,6 @@
             }
             document.getElementById('questContent').innerHTML = questHTML;
 
-            // Update inventory
             let invHTML = '';
             for (let item of gameState.inventory) {
                 invHTML += `<div>✦ ${item.name} x${item.quantity}</div>`;
@@ -785,7 +635,6 @@
                 gameState.mana = gameState.maxMana;
                 addCombatLog(`🌟 LEVEL UP! Level ${gameState.level}!`);
                 
-                // Spawn new monsters when level up
                 for (let i = 0; i < 3; i++) {
                     const angle = Math.random() * Math.PI * 2;
                     const distance = 400 + Math.random() * 800;
@@ -807,9 +656,7 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const mapScale = 1500;
-            const scale = canvas.width / (mapScale * 2);
 
-            // Draw trees
             ctx.fillStyle = '#00aa00';
             for (let tree of gameState.trees) {
                 const tx = (tree.x / mapScale) * canvas.width / 2 + canvas.width / 2;
@@ -821,7 +668,6 @@
                 }
             }
 
-            // Draw player
             const playerX = (playerMesh.position.x / mapScale) * canvas.width / 2 + canvas.width / 2;
             const playerY = (playerMesh.position.z / mapScale) * canvas.height / 2 + canvas.height / 2;
             ctx.fillStyle = '#0f0';
@@ -829,7 +675,6 @@
             ctx.arc(playerX, playerY, 6, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw monsters
             for (let monster of gameState.monsters) {
                 if (monster.health > 0) {
                     const mx = (monster.position.x / mapScale) * canvas.width / 2 + canvas.width / 2;
@@ -843,7 +688,6 @@
                 }
             }
 
-            // Border
             ctx.strokeStyle = '#0f0';
             ctx.lineWidth = 2;
             ctx.strokeRect(0, 0, canvas.width, canvas.height);
@@ -858,7 +702,7 @@
             const deltaTime = (currentTime - lastTime) / 1000;
             lastTime = currentTime;
 
-            // Player movement with acceleration
+            // Player movement
             const moveVector = new THREE.Vector3();
             if (keys['w'] || keys['arrowup']) moveVector.z -= 1;
             if (keys['s'] || keys['arrowdown']) moveVector.z += 1;
@@ -866,14 +710,22 @@
             if (keys['d'] || keys['arrowright']) moveVector.x += 1;
 
             if (moveVector.length() > 0) {
-                moveVector.normalize().multiplyScalar(0.35);
-                playerBody.velocity.x = moveVector.x * 20;
-                playerBody.velocity.z = moveVector.z * 20;
+                moveVector.normalize().multiplyScalar(playerSpeed);
+                playerMesh.position.add(moveVector);
             }
 
-            playerMesh.position.copy(playerBody.position);
+            // Apply gravity
+            playerVelocity.y -= 0.5;
+            playerMesh.position.y += playerVelocity.y * 0.02;
 
-            // Camera follow with smooth rotation
+            // Ground collision
+            if (playerMesh.position.y <= 1) {
+                playerMesh.position.y = 1;
+                playerVelocity.y = 0;
+                gameState.isJumping = false;
+            }
+
+            // Camera follow
             const cameraOffset = new THREE.Vector3(0, 2.5, 10);
             const targetCameraPos = playerMesh.position.clone().add(cameraOffset);
             camera.position.lerp(targetCameraPos, 0.15);
@@ -881,19 +733,7 @@
 
             // Update monsters
             for (let monster of gameState.monsters) {
-                monster.update(playerMesh.position, deltaTime);
-            }
-
-            // Physics
-            physicsWorld.step(1 / 60);
-
-            // Check ground collision for jumping
-            const raycaster = new THREE.Raycaster(playerMesh.position, new THREE.Vector3(0, -1, 0));
-            if (raycaster.ray.origin.y - 1 <= 0.5) {
-                canJump = true;
-                isJumping = false;
-            } else {
-                canJump = false;
+                monster.update(playerMesh.position);
             }
 
             // Remove dead monsters
@@ -923,7 +763,7 @@
             renderer.render(scene, camera);
         }
 
-        // ============ START SCREEN ============
+        // Start game
         document.getElementById('startButton').addEventListener('click', () => {
             document.getElementById('startScreen').classList.add('hidden');
             createQuests();
